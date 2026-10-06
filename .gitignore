@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+venv/
+.env
+.venv/
+
+# Training outputs / checkpoints
+Journal/eacm_final/
+Journal/eacm_test/
+Journal/resume_test/
+final_run/
+real_run/
+test_run/
+
+# Model checkpoints
+*.pth
+*.pth.tar
+
+# Logs
+*.log

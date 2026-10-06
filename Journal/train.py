@@ -133,17 +133,56 @@ def main():
     criterion_simclr = SupConLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    ema_optimizer= WeightEMA(model, ema_model, alpha=args.ema_decay)
+    ema_optimizer = WeightEMA(model, ema_model, alpha=args.ema_decay)
 
-    logger = Logger(os.path.join(args.out, f'Eacm_log_{args.n_labeled}.txt'), title='RAF')
-    logger.set_names(['Train Loss', 'Train Loss X', 'Train Loss U', 'Train Loss S_fea', 'Test Loss', 'Test Acc.'])
+    # Loggers
+    logger = Logger(
+        os.path.join(args.out, f'Eacm_log_{args.n_labeled}.txt'),
+        title='RAF'
+    )
+    logger.set_names([
+        'Train Loss',
+        'Train Loss X',
+        'Train Loss U',
+        'Train Loss S_fea',
+        'Test Loss',
+        'Test Acc.'
+    ])
 
-    logger_threshold = Logger(os.path.join(args.out, 'log_threshold.txt'), title='RAF')
-    logger_threshold.set_names(['Epoch', '0', '1', '2', '3', '4', '5', '6'])
+    logger_threshold = Logger(
+        os.path.join(args.out, 'log_threshold.txt'),
+        title='RAF'
+    )
+    logger_threshold.set_names([
+        'Epoch', '0', '1', '2', '3', '4', '5', '6'
+    ])
 
     test_accs = []
     threshold = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
+
+    # Resume from checkpoint
     start_epoch = 1
+    resume_path = r'.\eacm_final\Eacm_checkpoint_4000.pth.tar'
+
+    if os.path.isfile(resume_path):
+        print("==> Resuming from:", resume_path)
+
+        checkpoint = torch.load(
+            resume_path,
+            map_location='cuda',
+            weights_only=False
+        )
+
+        model.load_state_dict(checkpoint['state_dict'])
+        ema_model.load_state_dict(checkpoint['ema_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+
+        start_epoch = checkpoint['epoch']
+        best_acc = checkpoint['best_acc']
+
+        print("==> Resumed from epoch:", start_epoch)
+        print("==> Best accuracy:", best_acc)
+
     # Train and val
     for epoch in range(start_epoch, args.epochs + 1):
 
@@ -192,16 +231,16 @@ def train(logger_threshold, labeled_trainloader, unlabeled_trainloader, model, o
     model.train()
     for batch_idx in range(args.train_iteration):
         try:
-            inputs_x, targets_x = labeled_train_iter.next()
+            inputs_x, targets_x = next(labeled_train_iter)
         except:
             labeled_train_iter = iter(labeled_trainloader)
-            inputs_x, targets_x = labeled_train_iter.next()
+            inputs_x, targets_x = next(labeled_train_iter)
 
         try:
-            (inputs_u, inputs_u2, inputs_strong), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2, inputs_strong), _ = next(unlabeled_train_iter)
         except:
             unlabeled_train_iter = iter(unlabeled_trainloader)
-            (inputs_u, inputs_u2, inputs_strong), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2, inputs_strong), _ = next(unlabeled_train_iter)
 
         # measure data loading time
         data_time.update(time.time() - end)
@@ -357,7 +396,7 @@ class WeightEMA(object):
                 param.mul_(1 - self.wd)
 
 def mask_generate(max_probs, max_idx, batch, threshold):
-    mask_ori = torch.zeros(batch)
+    mask_ori = torch.zeros(batch, device=max_probs.device)
     for i in range(7):
         idx = np.where(max_idx.cpu() == i)[0]
         m = max_probs[idx].ge(threshold[i]).float()

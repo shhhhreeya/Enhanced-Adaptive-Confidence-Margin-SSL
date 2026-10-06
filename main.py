@@ -188,16 +188,16 @@ def train(labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_opti
     model.train()
     for batch_idx in range(args.train_iteration):
         try:
-            inputs_x, targets_x = labeled_train_iter.next()
+            inputs_x, targets_x = next(labeled_train_iter)
         except:
             labeled_train_iter = iter(labeled_trainloader)
-            inputs_x, targets_x = labeled_train_iter.next()
+            inputs_x, targets_x = next(labeled_train_iter)
 
         try:
-            (inputs_u, inputs_u2, inputs_strong), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2, inputs_strong), _ = next(unlabeled_train_iter)
         except:
             unlabeled_train_iter = iter(unlabeled_trainloader)
-            (inputs_u, inputs_u2, inputs_strong), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2, inputs_strong), _ = next(unlabeled_train_iter)
 
         # measure data loading time
         data_time.update(time.time() - end)
@@ -356,7 +356,7 @@ class WeightEMA(object):
                 param.mul_(1 - self.wd)
 
 def mask_generate(max_probs, max_idx, batch, threshold):
-    mask_ori = torch.zeros(batch)
+    mask_ori = torch.zeros(batch, device=max_probs.device)
     for i in range(7):
         idx = np.where(max_idx.cpu() == i)[0]
         m = max_probs[idx].ge(threshold[i]).float()
