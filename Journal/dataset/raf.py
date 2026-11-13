@@ -67,12 +67,17 @@ def data_split(filename, n_labeled, n_labeled_fear):
 
 def img_loader(path):
     try:
-        with open(path, 'rb') as f:
-            img = cv2.imread(path)
-            img = Image.fromarray(img)
-            return img
+        img = cv2.imread(path)
+
+        if img is None:
+            raise IOError("Cannot load image " + path)
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(img)
+
     except IOError:
         print('Cannot load image ' + path)
+        raise
 
 class Dataset_RAF(torch.utils.data.Dataset):
     def __init__(self, root, file_list, transform=None, loader=img_loader):

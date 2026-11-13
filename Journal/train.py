@@ -136,9 +136,11 @@ def main():
     ema_optimizer = WeightEMA(model, ema_model, alpha=args.ema_decay)
 
     # Loggers
+    resume_logs = bool(args.resume) and os.path.isfile(args.resume)
     logger = Logger(
         os.path.join(args.out, f'Eacm_log_{args.n_labeled}.txt'),
-        title='RAF'
+        title='RAF',
+        resume=resume_logs
     )
     logger.set_names([
         'Train Loss',
@@ -151,8 +153,10 @@ def main():
 
     logger_threshold = Logger(
         os.path.join(args.out, 'log_threshold.txt'),
-        title='RAF'
+        title='RAF',
+        resume=resume_logs
     )
+
     logger_threshold.set_names([
         'Epoch', '0', '1', '2', '3', '4', '5', '6'
     ])
@@ -162,7 +166,7 @@ def main():
 
     # Resume from checkpoint
     start_epoch = 1
-    resume_path = r'.\eacm_final\Eacm_checkpoint_4000.pth.tar'
+    resume_path = args.resume
 
     if os.path.isfile(resume_path):
         print("==> Resuming from:", resume_path)
@@ -180,6 +184,38 @@ def main():
         start_epoch = checkpoint['epoch']
         best_acc = checkpoint['best_acc']
 
+        # Restore adaptive thresholds
+        if 'threshold' in checkpoint:
+            threshold = checkpoint['threshold']
+        else:
+            # Recover thresholds from the last fully completed epoch
+            target_epoch = checkpoint['epoch'] - 1
+            threshold_log_path = os.path.join(
+                args.out, 'log_threshold.txt'
+            )
+
+            with open(threshold_log_path, 'r') as f:
+                lines = f.readlines()[1:]  # Skip header
+
+            matching_rows = [
+                line.strip().split()
+                for line in lines
+                if line.strip()
+                and int(float(line.strip().split()[0])) == target_epoch
+            ]
+
+            if not matching_rows:
+                raise RuntimeError(
+                    f"Could not find thresholds for epoch {target_epoch}"
+                )
+
+            threshold = [
+                float(value)
+                for value in matching_rows[-1][1:8]
+            ]
+
+        print("Restored thresholds:", threshold)
+
         print("==> Resumed from epoch:", start_epoch)
         print("==> Best accuracy:", best_acc)
 
@@ -187,9 +223,9 @@ def main():
     for epoch in range(start_epoch, args.epochs + 1):
 
         print('\nEpoch: [%d | %d] LR: %f' % (epoch, args.epochs, state['lr']))
-        
+
         train_loss, train_loss_x, train_loss_u, train_loss_sim_fea = train(logger_threshold, labeled_trainloader, unlabeled_trainloader, model, optimizer, ema_optimizer, criterion, criterion_simclr, threshold, epoch, use_cuda)
-       
+
         test_loss, test_acc = validate(test_loader, ema_model, criterion, epoch, use_cuda, mode='Test Stats')
 
         # append logger file
@@ -205,6 +241,10 @@ def main():
                 'acc': test_acc,
                 'best_acc': best_acc,
                 'optimizer' : optimizer.state_dict(),
+                'threshold': [
+                    float(t.item()) if torch.is_tensor(t) else float(t)
+                    for t in threshold
+                ],
             }, is_best)
         test_accs.append(test_acc)
     logger_threshold.close()
@@ -229,6 +269,21 @@ def train(logger_threshold, labeled_trainloader, unlabeled_trainloader, model, o
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
     model.train()
+    total_unlabeled = 0
+    total_accepted = 0
+    confidence_sum = 0.0
+    confidence_max = 0.0
+
+    class_names = [
+        "Surprise", "Fear", "Disgust", "Happiness",
+        "Sadness", "Anger", "Neutral"
+    ]
+
+    labeled_count = [0] * 7
+    labeled_correct = [0] * 7
+    labeled_confidence_sum = [0.0] * 7
+    correct_confidence_sum = [0.0] * 7
+
     for batch_idx in range(args.train_iteration):
         try:
             inputs_x, targets_x = next(labeled_train_iter)
@@ -261,17 +316,47 @@ def train(logger_threshold, labeled_trainloader, unlabeled_trainloader, model, o
         p = (torch.softmax(outputs_u, dim=1) + torch.softmax(outputs_u2, dim=1)) / 2
         max_probs, max_idx = torch.max(p, dim=1)
         max_idx = max_idx.detach()
-        
+
 
         output_x, _ = model(inputs_x)
         Lx = criterion_ce(output_x, targets_x).mean()
+
+        with torch.no_grad():
+            probs_x = torch.softmax(output_x, dim=1)
+            max_probs_x, predicted_x = torch.max(probs_x, dim=1)
+
+            for i in range(7):
+                class_mask = (targets_x == i)
+                correct_mask = class_mask & (predicted_x == targets_x)
+
+                labeled_count[i] += int(class_mask.sum().item())
+                labeled_correct[i] += int(correct_mask.sum().item())
+
+                labeled_confidence_sum[i] += (
+                    max_probs_x[class_mask].sum().item()
+                )
+
+                correct_confidence_sum[i] += (
+                    max_probs_x[correct_mask].sum().item()
+                )
 
         # update threshold
         threshold = adaptive_threshold_generate(output_x, targets_x, threshold, epoch)
         logger_threshold.append([epoch, threshold[0], threshold[1], threshold[2], threshold[3], threshold[4], threshold[5], threshold[6]])
 
         mask = mask_generate(max_probs, max_idx, batch_size_u, threshold)
-        
+        total_unlabeled += batch_size_u
+        total_accepted += int(mask.sum().item())
+        confidence_sum += max_probs.sum().item()
+        confidence_max = max(confidence_max, max_probs.max().item())
+        if batch_idx < 10:
+            print(
+                f"Pseudo-labels accepted: {int(mask.sum().item())}/{batch_size_u} | "
+                f"Max confidence: {max_probs.max().item():.4f} | "
+                f"Mean confidence: {max_probs.mean().item():.4f} | "
+                f"Thresholds: {[round(float(t.item()) if torch.is_tensor(t) else float(t), 4) for t in threshold]}"
+            )
+
         mask_idx = np.where(mask.cpu() == 0)[0]
         features_prob = torch.cat([feature_u[mask_idx, :].unsqueeze(1), feature_u2[mask_idx, :].unsqueeze(1)], dim=1)
         if features_prob.shape[0] ==0:
@@ -294,6 +379,14 @@ def train(logger_threshold, labeled_trainloader, unlabeled_trainloader, model, o
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
+        if batch_idx < 3:
+            print(
+                f"\n[DEBUG] Batch {batch_idx + 1}"
+                f"\nLogits mean: {output_x.detach().mean().item():.6f}"
+                f"\nLogits std: {output_x.detach().std().item():.6f}"
+                f"\nClassifier weight grad: {model.module.classifier.weight.grad.norm().item():.6f}"
+                f"\nClassifier bias grad: {model.module.classifier.bias.grad.norm().item():.6f}"
+            )
         optimizer.step()
         ema_optimizer.step()
 
@@ -313,6 +406,39 @@ def train(logger_threshold, labeled_trainloader, unlabeled_trainloader, model, o
                     )
         bar.next()
     bar.finish()
+    print("\n========== PSEUDO-LABEL SUMMARY ==========")
+    print("\n========== PSEUDO-LABEL SUMMARY ==========")
+    print(f"Total unlabeled samples: {total_unlabeled}")
+    print(f"Accepted pseudo-labels: {total_accepted}")
+    print(f"Acceptance rate: {100 * total_accepted / total_unlabeled:.2f}%")
+    print(f"Average confidence: {confidence_sum / total_unlabeled:.4f}")
+    print(f"Peak confidence: {confidence_max:.4f}")
+    print("==========================================\n")
+
+    print("\n========== LABELLED CLASS DIAGNOSTICS ==========")
+
+    for i in range(7):
+        count = labeled_count[i]
+        correct = labeled_correct[i]
+
+        if count > 0:
+            accuracy = 100 * correct / count
+            avg_conf = labeled_confidence_sum[i] / count
+            correct_conf = (
+                correct_confidence_sum[i] / correct
+                if correct > 0 else 0.0
+            )
+
+            print(
+                f"{class_names[i]:10s} | "
+                f"Count: {count:5d} | "
+                f"Accuracy: {accuracy:6.2f}% | "
+                f"Avg confidence: {avg_conf:.4f} | "
+                f"Correct confidence: {correct_conf:.4f}"
+            )
+
+    print("=================================================\n")
+
 
     return (losses.avg, losses_x.avg, losses_u.avg, losses_sim_fea.avg)
 

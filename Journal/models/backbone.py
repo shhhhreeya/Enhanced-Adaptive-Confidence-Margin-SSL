@@ -1,4 +1,5 @@
 import math
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,7 +16,8 @@ class ResNet_18(nn.Module):
 
         ResNet18 = torchvision.models.resnet18(pretrained=False)
         
-        checkpoint = torch.load('./models/resnet18_msceleb.pth')
+        checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'resnet18_msceleb.pth'))
+        checkpoint = torch.load(checkpoint_path)
         ResNet18.load_state_dict(checkpoint['state_dict'], strict=True)
 
         self.base = nn.Sequential(*list(ResNet18.children())[:-2])
