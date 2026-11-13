@@ -1,0 +1,4 @@
+approach,accuracy,macro_f1,evaluation
+Supervised,0.8191003911342895,0.7513,End-to-end fine-tuned classifier
+Unsupervised,0.6033246414602347,0.5049229764022761,Frozen-backbone linear probe
+Semi-supervised EACM,0.84452412,0.7774,End-to-end semi-supervised EACM classifier

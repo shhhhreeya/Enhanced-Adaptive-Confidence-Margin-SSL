@@ -73,3 +73,131 @@ If you find our work useful in your research, please consider citing:
 ## Note
 
 If you have any questions, please contact me.  Email:  hangyuli.xidian@gmail.com
+
+
+---
+
+# Research Extension: Comparative Study of Learning Paradigms
+
+This repository extends the original Ada-CM implementation with additional experiments comparing supervised, unsupervised, and semi-supervised approaches for Facial Emotion Recognition (FER) using RAF-DB.
+
+The extension investigates how different learning paradigms utilize labeled and unlabeled facial images and compares their resulting classification performance and learned representations.
+
+**Note:** The original Ada-CM implementation and research paper are credited to their respective authors. The following experiments and comparative evaluation constitute an extension of that work.
+
+## Learning Approaches
+
+### 1. Supervised Learning
+
+- ResNet-18 backbone initialized using pretrained MS-Celeb-1M weights.
+- Trained using 4,000 labeled RAF-DB training samples.
+- Cross-entropy loss for emotion classification.
+- End-to-end model fine-tuning.
+
+### 2. Unsupervised Learning
+
+- Contrastive representation learning using two augmented views of each image.
+- Uses all 12,271 RAF-DB training images without accessing emotion labels during representation learning.
+- Evaluated using K-Means clustering and a frozen-backbone linear probe.
+
+### 3. Semi-Supervised Learning (EACM)
+
+- Uses 4,000 labeled and 8,271 unlabeled training samples.
+- Adaptive class-specific confidence thresholds for pseudo-label selection.
+- Combines supervised classification, pseudo-label-based learning, and contrastive feature learning.
+
+## Dataset and Experimental Setup
+
+| Parameter | Value |
+|---|---:|
+| Training images | 12,271 |
+| Test images | 3,068 |
+| Emotion classes | 7 |
+| Labeled training samples | 4,000 |
+| Unlabeled training samples | 8,271 |
+| Random seed | 2 |
+| Training epochs | 20 |
+
+The same saved labeled subset is used for supervised and semi-supervised experiments.
+
+The seven emotion categories are Surprise, Fear, Disgust, Happiness, Sadness, Anger, and Neutral.
+
+## Comparative Results
+
+| Learning Approach | Accuracy | Macro F1 |
+|---|---:|---:|
+| Supervised | 81.91% | 75.13% |
+| Unsupervised (Linear Probe) | 60.33% | 50.49% |
+| Semi-Supervised (EACM) | **84.45%** | **77.74%** |
+
+EACM achieved an improvement of 2.54 percentage points in accuracy and 2.61 percentage points in macro F1 compared with the supervised baseline.
+
+**Evaluation note:** The unsupervised result is obtained through a frozen-backbone linear probe, whereas the supervised and semi-supervised models are fine-tuned end-to-end. Therefore, the three results do not represent identical evaluation protocols.
+
+### Overall Performance
+
+![Comparison Metrics](results_comparison/comparison_metrics.png)
+
+### Class-wise F1 Comparison
+
+![Class-wise F1 Radar Chart](results_comparison/classwise_f1_radar.png)
+
+### Confusion Matrices
+
+**Supervised**
+
+![Supervised Confusion Matrix](results_comparison/confusion_matrix_supervised.png)
+
+**Unsupervised**
+
+![Unsupervised Confusion Matrix](results_comparison/confusion_matrix_unsupervised.png)
+
+**Semi-Supervised (EACM)**
+
+![EACM Confusion Matrix](results_comparison/confusion_matrix_eacm.png)
+
+### Unsupervised Clustering Evaluation
+
+The best unsupervised checkpoint achieved the following clustering results:
+
+| Metric | Value |
+|---|---:|
+| Adjusted Rand Index | 0.0348 |
+| Normalized Mutual Information | 0.0528 |
+| Hungarian-matched Accuracy | 24.38% |
+
+![Unsupervised Clustering Metrics](results_comparison/unsupervised_clustering_metrics.png)
+
+Clustering metrics measure agreement between discovered clusters and ground-truth categories; they should not be interpreted as conventional classifier accuracy.
+
+## Additional Scripts
+
+The research extension introduces the following scripts inside `Journal/`:
+
+| Script | Purpose |
+|---|---|
+| `train_supervised.py` | Supervised baseline training |
+| `train_unsupervised.py` | Contrastive representation learning |
+| `train.py` | Semi-supervised EACM training |
+| `save_raf_split.py` | Reproducible labeled/unlabeled split |
+| `evaluate_raf.py` | RAF-DB classification evaluation |
+| `evaluate_unsupervised.py` | Clustering evaluation |
+| `evaluate_linear_probe.py` | Frozen-backbone linear probe |
+| `compile_results.py` | Consolidation of experiment results |
+| `generate_report_graphs.py` | Generation of comparison visualizations |
+
+## Limitations
+
+- RAF-DB contains imbalanced emotion classes, particularly Fear.
+- Experiments use a single random seed.
+- The supervised and EACM scripts select their best checkpoints using test-set accuracy, introducing test-set model-selection bias.
+- The unsupervised linear-probe protocol differs from end-to-end fine-tuning.
+- Results should therefore be interpreted as exploratory experimental findings.
+
+## Reproducibility
+
+The dataset and pretrained model checkpoints are not included in this repository. They must be obtained separately and configured before running the additional training scripts.
+
+The research experiments use a saved RAF-DB split and random seed 2.
+
+Please refer to the original Ada-CM documentation above for the original implementation's setup and citation.

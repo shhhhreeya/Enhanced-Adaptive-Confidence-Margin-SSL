@@ -1,0 +1,163 @@
+{
+    "project": "Comparison of Supervised, Unsupervised and Semi-Supervised Learning for Facial Emotion Recognition",
+    "dataset": {
+        "name": "RAF-DB",
+        "training_images": 12271,
+        "testing_images": 3068,
+        "number_of_classes": 7,
+        "labeled_training_images_for_supervised_and_eacm": 4000,
+        "unlabeled_training_images_for_eacm": 8271,
+        "split_seed": 2
+    },
+    "results": {
+        "supervised": {
+            "accuracy": 0.8191003911342895,
+            "macro_f1": 0.7513,
+            "best_epoch": 8,
+            "evaluation": "End-to-end fine-tuned classifier"
+        },
+        "unsupervised": {
+            "accuracy": 0.6033246414602347,
+            "macro_f1": 0.5049229764022761,
+            "confusion_matrix": [
+                [
+                    221,
+                    8,
+                    15,
+                    12,
+                    16,
+                    22,
+                    35
+                ],
+                [
+                    16,
+                    24,
+                    4,
+                    11,
+                    3,
+                    12,
+                    4
+                ],
+                [
+                    12,
+                    1,
+                    67,
+                    13,
+                    24,
+                    18,
+                    25
+                ],
+                [
+                    55,
+                    20,
+                    41,
+                    875,
+                    98,
+                    40,
+                    56
+                ],
+                [
+                    18,
+                    7,
+                    48,
+                    63,
+                    215,
+                    52,
+                    75
+                ],
+                [
+                    8,
+                    4,
+                    16,
+                    7,
+                    12,
+                    111,
+                    4
+                ],
+                [
+                    98,
+                    3,
+                    98,
+                    24,
+                    90,
+                    29,
+                    338
+                ]
+            ],
+            "number_of_test_samples": 3068,
+            "clustering": [
+                {
+                    "checkpoint": "unsupervised_best.pth",
+                    "epoch": 19,
+                    "ARI": 0.03480963465756403,
+                    "NMI": 0.052829149822562,
+                    "Hungarian_accuracy": 0.2438070404172099,
+                    "cluster_counts": [
+                        422,
+                        424,
+                        441,
+                        433,
+                        411,
+                        507,
+                        430
+                    ]
+                },
+                {
+                    "checkpoint": "unsupervised_latest.pth",
+                    "epoch": 20,
+                    "ARI": 0.029275136183564473,
+                    "NMI": 0.05759035512698136,
+                    "Hungarian_accuracy": 0.23565840938722293,
+                    "cluster_counts": [
+                        448,
+                        480,
+                        408,
+                        386,
+                        459,
+                        413,
+                        474
+                    ]
+                }
+            ]
+        },
+        "semi_supervised_eacm": {
+            "accuracy": 0.84452412,
+            "macro_f1": 0.7774,
+            "best_epoch": 9,
+            "evaluation": "End-to-end semi-supervised EACM classifier",
+            "pseudo_label_acceptance_at_epoch_20": 0.4433
+        }
+    },
+    "comparison": [
+        {
+            "approach": "Supervised",
+            "accuracy": 0.8191003911342895,
+            "macro_f1": 0.7513,
+            "evaluation": "End-to-end fine-tuned classifier"
+        },
+        {
+            "approach": "Unsupervised",
+            "accuracy": 0.6033246414602347,
+            "macro_f1": 0.5049229764022761,
+            "evaluation": "Frozen-backbone linear probe"
+        },
+        {
+            "approach": "Semi-supervised EACM",
+            "accuracy": 0.84452412,
+            "macro_f1": 0.7774,
+            "evaluation": "End-to-end semi-supervised EACM classifier"
+        }
+    ],
+    "eacm_improvement_over_supervised": {
+        "accuracy_percentage_points": 2.54,
+        "macro_f1_percentage_points": 2.61
+    },
+    "methodology_and_limitations": [
+        "Results are from a single random seed.",
+        "Supervised and EACM checkpoints were selected using test accuracy, introducing test-set leakage.",
+        "The unsupervised model was evaluated using a frozen-backbone linear probe, whereas supervised and EACM models were fine-tuned end-to-end.",
+        "The linear probe used 4000 labeled training images and a fixed 100-epoch training schedule without a validation set.",
+        "Unsupervised clustering metrics are not directly comparable to classifier accuracy.",
+        "The RAF-DB dataset was obtained from a third-party Kaggle distribution; its provenance and licensing should be disclosed."
+    ]
+}

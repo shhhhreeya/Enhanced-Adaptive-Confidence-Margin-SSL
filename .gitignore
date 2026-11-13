@@ -22,3 +22,23 @@ test_run/
 
 # Logs
 *.log
+.venv/
+
+# Datasets (do not upload)
+/datasets/
+/fer2013/
+
+# Experiment outputs and checkpoints
+/results_raf_20_epochs/
+/results_raf_class_diagnostic/
+/results_raf_diagnostic/
+/results_raf_gradient/
+/results_raf_one_epoch/
+/results_raf_smoke/
+/results_unsupervised_raf/
+
+# Local editor settings
+.vscode/
+
+# Temporary backup
+Journal/train_before_resume_backup.py

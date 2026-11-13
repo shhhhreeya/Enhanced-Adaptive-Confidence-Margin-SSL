@@ -45,18 +45,21 @@ class Logger(object):
                 self.file = open(fpath, 'w')
 
     def set_names(self, names):
-        if self.resume: 
-            pass
-        # initialize numbers as empty list
+        if self.resume:
+            if names != self.names:
+                raise ValueError("Log column names do not match existing log")
+            return
+
         self.numbers = {}
         self.names = names
+
         for _, name in enumerate(self.names):
             self.file.write(name)
             self.file.write('\t')
             self.numbers[name] = []
+
         self.file.write('\n')
         self.file.flush()
-
 
     def append(self, numbers):
         assert len(self.names) == len(numbers), 'Numbers do not match names'
